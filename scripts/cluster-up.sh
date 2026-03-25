@@ -44,6 +44,7 @@ k3d image import crypto-api:latest crypto-web:latest -c "${CLUSTER}"
 # ── 5. Apply manifests ─────────────────────────────────────────────────────────
 info "Applying Kubernetes manifests..."
 kubectl apply -f "${ROOT}/infra/namespace.yaml"
+kubectl apply -f "${ROOT}/infra/redis/"
 kubectl apply -f "${ROOT}/infra/api/"
 kubectl apply -f "${ROOT}/infra/web/"
 kubectl apply -f "${ROOT}/infra/ingress.yaml"
@@ -55,6 +56,7 @@ kubectl rollout restart deployment/web -n crypto-demo
 
 # ── 7. Wait for rollout ─────────────────────────────────────────────────────────
 info "Waiting for deployments to be ready..."
+kubectl rollout status deployment/redis -n crypto-demo --timeout=120s
 kubectl rollout status deployment/api -n crypto-demo --timeout=120s
 kubectl rollout status deployment/web -n crypto-demo --timeout=120s
 
