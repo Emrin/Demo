@@ -44,6 +44,12 @@ k3d image import crypto-api:latest crypto-web:latest -c "${CLUSTER}"
 # ── 5. Apply manifests ─────────────────────────────────────────────────────────
 info "Applying Kubernetes manifests..."
 kubectl apply -f "${ROOT}/infra/namespace.yaml"
+kubectl create secret generic postgres-credentials \
+  --from-env-file="${ROOT}/infra/postgres/secret.env" \
+  --namespace=crypto-demo \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "${ROOT}/infra/postgres/deployment.yaml"
+kubectl apply -f "${ROOT}/infra/postgres/service.yaml"
 kubectl apply -f "${ROOT}/infra/redis/"
 kubectl apply -f "${ROOT}/infra/api/"
 kubectl apply -f "${ROOT}/infra/web/"
@@ -56,6 +62,7 @@ kubectl rollout restart deployment/web -n crypto-demo
 
 # ── 7. Wait for rollout ─────────────────────────────────────────────────────────
 info "Waiting for deployments to be ready..."
+kubectl rollout status deployment/postgres -n crypto-demo --timeout=120s
 kubectl rollout status deployment/redis -n crypto-demo --timeout=120s
 kubectl rollout status deployment/api -n crypto-demo --timeout=120s
 kubectl rollout status deployment/web -n crypto-demo --timeout=120s

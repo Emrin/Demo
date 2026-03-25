@@ -12,15 +12,21 @@ RUN pnpm install --frozen-lockfile
 # Copy source
 COPY packages packages
 COPY apps/api apps/api
-# Build
+# Generate Prisma client and build
+RUN pnpm --filter api exec prisma generate
 RUN pnpm --filter api build
 # Deploy production bundle (pnpm deploy excludes gitignored dist/, copy manually)
 RUN pnpm --filter api deploy --prod /deploy
 RUN cp -r apps/api/dist /deploy/dist
+RUN cp -r apps/api/prisma /deploy/prisma
+# Re-generate Prisma client inside the isolated deploy dir
+RUN cd /deploy && node_modules/.bin/prisma generate --schema=prisma/schema.prisma
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /deploy ./
 EXPOSE 3000
-CMD ["node", "dist/main"]
+# Run migrations then start — pod will restart if Postgres isn't ready yet
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main"]
