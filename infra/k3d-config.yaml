@@ -1,0 +1,22 @@
+# k3d cluster simulating 3 VPS servers:
+#   server-0  → gateway / control-plane (Traefik ingress runs here)
+#   agent-0   → web VPS
+#   agent-1   → api VPS
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: crypto
+servers: 1
+agents: 2
+# Expose port 8080 on the host → port 80 on the k3d load balancer (Traefik)
+ports:
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
+    timeout: "120s"
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

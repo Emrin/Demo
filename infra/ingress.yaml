@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crypto-demo
+  namespace: crypto-demo
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          # More specific path first — routes /api/* to NestJS
+          # NestJS has global prefix 'api', so it handles /api/hello etc.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          # Catch-all — routes everything else to the Astro SSR server
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 4321

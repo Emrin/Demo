@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: crypto-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      # Pin to the "web VPS" node
+      nodeSelector:
+        vps-role: web
+      containers:
+        - name: web
+          image: crypto-web:latest
+          # Never pull — image was imported directly via k3d image import
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4321
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "4321"

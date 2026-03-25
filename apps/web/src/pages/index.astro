@@ -21,12 +21,13 @@
 		<button id="hello-btn">Test API Connection</button>
 		<p id="result"></p>
 		<script>
+			const apiBase = import.meta.env.PUBLIC_API_URL || '';
 			document.getElementById('hello-btn')?.addEventListener('click', async () => {
 				const result = document.getElementById('result')!;
 				result.className = '';
 				result.textContent = 'Loading...';
 				try {
-					const res = await fetch('http://localhost:3000/hello');
+					const res = await fetch(`${apiBase}/api/hello`);
 					if (!res.ok) throw new Error(`HTTP ${res.status}`);
 					result.textContent = await res.text();
 				} catch (e) {
