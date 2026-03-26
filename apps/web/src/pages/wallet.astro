@@ -145,7 +145,7 @@ function txToUsd(tx: Tx): string {
                       {toDecimal(tx.amountSats)} {tx.currency}
                     </td>
                     <td>
-                      <span class={`badge badge-sm ${tx.status === 'settled' ? 'badge-success' : 'badge-error'}`}>
+                      <span class={`badge badge-sm ${tx.status === 'settled' ? 'badge-success' : tx.status === 'expired' ? 'badge-warning' : 'badge-error'}`}>
                         {tx.status}
                       </span>
                     </td>

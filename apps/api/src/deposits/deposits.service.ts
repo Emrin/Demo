@@ -140,70 +140,113 @@ export class DepositsService {
     const event = payload as {
       type: string;
       invoiceId?: string;
+      afterExpiration?: boolean;
+      payment?: { value: string };
     };
 
     this.logger.log(`Webhook event: ${event.type} invoiceId=${event.invoiceId}`);
 
-    if (event.type !== 'InvoiceSettled') return;
-
-    const invoiceId = event.invoiceId;
-    if (!invoiceId) {
-      throw new BadRequestException('Missing invoiceId in webhook payload');
+    switch (event.type) {
+      case 'InvoiceExpired':
+        if (event.invoiceId) await this.handleExpired(event.invoiceId);
+        break;
+      case 'InvoiceSettled':
+        if (!event.invoiceId) throw new BadRequestException('Missing invoiceId');
+        await this.handleSettled(event.invoiceId);
+        break;
+      case 'InvoicePaymentSettled':
+        // Only act on payments that arrived after the invoice expired —
+        // normal on-time payments are covered by InvoiceSettled above.
+        if (event.afterExpiration && event.invoiceId) {
+          await this.handleLatePayment(event.invoiceId, event.payment?.value);
+        }
+        break;
+      default:
+        // Other event types (InvoiceCreated, InvoiceProcessing, …) — ignore
     }
+  }
 
-    const transaction = await this.prisma.transaction.findUnique({
+  private async handleExpired(invoiceId: string): Promise<void> {
+    const tx = await this.prisma.transaction.findUnique({ where: { invoiceId } });
+    if (!tx || tx.status !== 'pending') return;
+    await this.prisma.transaction.update({
       where: { invoiceId },
+      data: { status: 'expired' },
     });
+    this.logger.log(`Invoice ${invoiceId} marked as expired`);
+  }
 
-    if (!transaction) {
+  private async handleSettled(invoiceId: string): Promise<void> {
+    const tx = await this.prisma.transaction.findUnique({ where: { invoiceId } });
+    if (!tx) {
       this.logger.warn(`No transaction found for invoiceId=${invoiceId}`);
       return;
     }
-
-    if (transaction.status === 'settled') {
-      this.logger.log(`Transaction ${invoiceId} already settled, skipping`);
+    if (tx.status === 'settled') {
+      this.logger.log(`Invoice ${invoiceId} already settled, skipping`);
       return;
     }
 
-    // Fetch actual paid amount (handles overpayment)
+    // Fetch actual paid amount from BtcPayServer to handle overpayments
     const pmRes = await fetch(
       `${this.btcpayUrl}/api/v1/stores/${this.storeId}/invoices/${invoiceId}/payment-methods`,
       { headers: { Authorization: `token ${this.apiKey}` } },
     );
 
-    let creditUnits = transaction.amountSats;
+    let creditUnits = tx.amountSats;
     if (pmRes.ok) {
       const methods = (await pmRes.json()) as Array<{
         paymentMethodId: string;
         totalPaid: string;
       }>;
-      const method = methods.find(
-        (m) => m.paymentMethodId === `${transaction.currency}-CHAIN`,
-      );
+      const method = methods.find((m) => m.paymentMethodId === `${tx.currency}-CHAIN`);
       if (method?.totalPaid) {
         const paid = BigInt(Math.round(parseFloat(method.totalPaid) * 1e8));
         if (paid > 0n) creditUnits = paid;
       }
     }
 
-    // Credit the correct balance based on currency
-    const balanceField =
-      transaction.currency === 'LTC' ? 'balanceLitoshi' : 'balanceSats';
+    await this.creditUser(tx, invoiceId, creditUnits);
+  }
 
+  private async handleLatePayment(invoiceId: string, paymentValue?: string): Promise<void> {
+    const tx = await this.prisma.transaction.findUnique({ where: { invoiceId } });
+    if (!tx) {
+      this.logger.warn(`No transaction found for late payment invoiceId=${invoiceId}`);
+      return;
+    }
+    if (tx.status === 'settled') {
+      this.logger.log(`Invoice ${invoiceId} already settled, skipping late payment`);
+      return;
+    }
+
+    let creditUnits = tx.amountSats;
+    if (paymentValue) {
+      const paid = BigInt(Math.round(parseFloat(paymentValue) * 1e8));
+      if (paid > 0n) creditUnits = paid;
+    }
+
+    await this.creditUser(tx, invoiceId, creditUnits);
+    this.logger.log(`Late payment credited for invoice ${invoiceId}`);
+  }
+
+  private async creditUser(
+    tx: { userId: number; currency: string },
+    invoiceId: string,
+    creditUnits: bigint,
+  ): Promise<void> {
+    const balanceField = tx.currency === 'LTC' ? 'balanceLitoshi' : 'balanceSats';
     await this.prisma.$transaction([
       this.prisma.transaction.update({
         where: { invoiceId },
         data: { status: 'settled', amountSats: creditUnits },
       }),
       this.prisma.user.update({
-        where: { id: transaction.userId },
+        where: { id: tx.userId },
         data: { [balanceField]: { increment: creditUnits } },
       }),
     ]);
-
-    this.logger.log(
-      `Credited ${creditUnits} ${transaction.currency} units to user ${transaction.userId}`,
-    );
+    this.logger.log(`Credited ${creditUnits} ${tx.currency} to user ${tx.userId}`);
   }
 
   async getInvoiceStatus(invoiceId: string): Promise<{ status: string }> {
