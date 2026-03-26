@@ -1,0 +1,173 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const token = Astro.cookies.get('token')?.value;
+if (!token) return Astro.redirect('/login');
+
+const API_URL = process.env.API_URL || 'http://api:3000';
+
+type MnemonicCookie = {
+  words: string[];
+  phase: 'write' | 'verify';
+  challengeIndex: number | null;
+};
+
+function readCookie(): MnemonicCookie | null {
+  try {
+    return JSON.parse(Astro.cookies.get('mnemonic')?.value ?? '');
+  } catch {
+    return null;
+  }
+}
+
+function setCookie(value: MnemonicCookie) {
+  Astro.cookies.set('mnemonic', JSON.stringify(value), {
+    httpOnly: true,
+    path: '/',
+    maxAge: 60 * 30,
+    sameSite: 'lax',
+  });
+}
+
+let state = readCookie();
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action') as string;
+
+  if (action === 'proceed' && state) {
+    const idx = Math.floor(Math.random() * state.words.length);
+    setCookie({ words: state.words, phase: 'verify', challengeIndex: idx });
+    return Astro.redirect('/recovery-setup');
+  }
+
+  if (action === 'verify' && state?.phase === 'verify' && state.challengeIndex !== null) {
+    const answer = (form.get('answer') as string ?? '').trim().toLowerCase();
+    if (answer === state.words[state.challengeIndex]) {
+      // Correct — confirm with API and get a new JWT (confirmed: true)
+      const res = await fetch(`${API_URL}/api/auth/confirm-mnemonic`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { access_token } = await res.json();
+        Astro.cookies.set('token', access_token, {
+          httpOnly: true,
+          path: '/',
+          maxAge: 60 * 60 * 24 * 7,
+          sameSite: 'lax',
+        });
+        Astro.cookies.delete('mnemonic', { path: '/' });
+        return Astro.redirect('/');
+      }
+      error = 'Could not confirm with server. Try again.';
+    } else {
+      error = 'Incorrect word. Check your notes and try again.';
+    }
+    // Re-read cookie after potential setCookie calls
+    state = readCookie();
+  }
+}
+---
+
+<Layout title="Save Recovery Phrase — Crypto Demo">
+  <div class="min-h-screen flex flex-col items-center justify-center p-4 py-12">
+    <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+      <div class="card-body gap-5">
+
+        {!state ? (
+          // Mnemonic cookie missing or expired
+          <div class="flex flex-col gap-4">
+            <h1 class="card-title text-2xl">Recovery setup required</h1>
+            <div role="alert" class="alert alert-warning text-sm">
+              Your recovery setup session has expired. Please sign up again or contact support.
+            </div>
+            <a href="/signup" class="btn btn-primary w-full">Sign up again</a>
+          </div>
+        ) : state.phase === 'write' ? (
+          <>
+            <div>
+              <h1 class="card-title text-2xl">Save your recovery phrase</h1>
+              <p class="text-sm text-base-content/70 mt-1">
+                Write these 12 words on paper, in order, and keep them somewhere safe.
+                They are the <strong>only way</strong> to recover your account if you lose access.
+              </p>
+            </div>
+
+            <div role="alert" class="alert alert-warning text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>Never share these words with anyone. Store them offline only.</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              {state.words.map((word, i) => (
+                <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2">
+                  <span class="text-xs text-base-content/50 w-5 text-right shrink-0">{i + 1}.</span>
+                  <span class="font-mono font-semibold tracking-wide">{word}</span>
+                </div>
+              ))}
+            </div>
+
+            <form method="POST">
+              <input type="hidden" name="_action" value="proceed" />
+              <button type="submit" class="btn btn-primary w-full">
+                I've written these down →
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <div>
+              <h1 class="card-title text-2xl">Confirm your recovery phrase</h1>
+              <p class="text-sm text-base-content/70 mt-1">
+                Enter word <strong>#{(state.challengeIndex ?? 0) + 1}</strong> from your recovery phrase.
+              </p>
+            </div>
+
+            {error && (
+              <div role="alert" class="alert alert-error text-sm">{error}</div>
+            )}
+
+            <div class="grid grid-cols-2 gap-2">
+              {state.words.map((word, i) => (
+                <div class={`flex items-center gap-2 rounded-lg px-3 py-2 ${i === state!.challengeIndex ? 'bg-primary/10 ring-1 ring-primary' : 'bg-base-200'}`}>
+                  <span class="text-xs text-base-content/50 w-5 text-right shrink-0">{i + 1}.</span>
+                  {i === state!.challengeIndex ? (
+                    <span class="font-mono font-semibold text-primary tracking-widest">{'_ '.repeat(word.length).trim()}</span>
+                  ) : (
+                    <span class="font-mono font-semibold tracking-wide">{word}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <form method="POST" class="flex flex-col gap-3">
+              <input type="hidden" name="_action" value="verify" />
+              <label class="form-control">
+                <div class="label">
+                  <span class="label-text">Word #{(state.challengeIndex ?? 0) + 1}</span>
+                </div>
+                <input
+                  type="text"
+                  name="answer"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="off"
+                  spellcheck={false}
+                  required
+                  class="input input-bordered font-mono"
+                  placeholder="type the missing word"
+                />
+              </label>
+              <button type="submit" class="btn btn-primary w-full">Confirm</button>
+            </form>
+          </>
+        )}
+
+      </div>
+    </div>
+  </div>
+</Layout>

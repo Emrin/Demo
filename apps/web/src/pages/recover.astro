@@ -1,0 +1,101 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const API_URL = process.env.API_URL || 'http://localhost:3000';
+let error = '';
+let success = false;
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const username = data.get('username') as string;
+  const newPassword = data.get('newPassword') as string;
+  const words = Array.from({ length: 12 }, (_, i) => (data.get(`word${i + 1}`) as string ?? '').trim().toLowerCase());
+  const mnemonic = words.join(' ');
+
+  try {
+    const res = await fetch(`${API_URL}/api/auth/recover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, mnemonic, newPassword }),
+    });
+
+    if (res.ok) {
+      const { access_token } = await res.json();
+      Astro.cookies.set('token', access_token, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: 'lax',
+      });
+      return Astro.redirect('/');
+    } else {
+      error = 'Invalid username or recovery phrase.';
+    }
+  } catch {
+    error = 'Could not reach API';
+  }
+}
+---
+
+<Layout title="Recover Account — Crypto Demo">
+  <div class="min-h-screen flex flex-col items-center justify-center p-4 py-12">
+    <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+      <div class="card-body gap-5">
+
+        <div>
+          <h1 class="card-title text-2xl">Recover your account</h1>
+          <p class="text-sm text-base-content/70 mt-1">
+            Enter your username, your 12-word recovery phrase, and a new password.
+          </p>
+        </div>
+
+        {error && (
+          <div role="alert" class="alert alert-error text-sm">{error}</div>
+        )}
+
+        <form method="POST" class="flex flex-col gap-5">
+
+          <label class="form-control">
+            <div class="label"><span class="label-text">Username</span></div>
+            <input type="text" name="username" required class="input input-bordered w-full" />
+          </label>
+
+          <div>
+            <div class="label pb-1"><span class="label-text">Recovery phrase</span></div>
+            <div class="grid grid-cols-2 gap-2">
+              {Array.from({ length: 12 }, (_, i) => (
+                <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-1.5">
+                  <span class="text-xs text-base-content/50 w-5 text-right shrink-0">{i + 1}.</span>
+                  <input
+                    type="text"
+                    name={`word${i + 1}`}
+                    required
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck={false}
+                    class="bg-transparent font-mono text-sm w-full outline-none placeholder:text-base-content/30"
+                    placeholder="word"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label class="form-control">
+            <div class="label"><span class="label-text">New password</span></div>
+            <input type="password" name="newPassword" minlength="8" required class="input input-bordered w-full" />
+            <div class="label"><span class="label-text-alt">Minimum 8 characters</span></div>
+          </label>
+
+          <button type="submit" class="btn btn-primary w-full">Recover account</button>
+        </form>
+
+        <p class="text-sm text-center">
+          <a href="/login" class="link link-primary">Back to login</a>
+        </p>
+
+      </div>
+    </div>
+  </div>
+</Layout>

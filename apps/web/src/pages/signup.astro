@@ -16,14 +16,21 @@ if (Astro.request.method === 'POST') {
     });
 
     if (res.ok) {
-      const { access_token } = await res.json();
+      const { access_token, mnemonic } = await res.json();
       Astro.cookies.set('token', access_token, {
         httpOnly: true,
         path: '/',
         maxAge: 60 * 60 * 24 * 7,
         sameSite: 'lax',
       });
-      return Astro.redirect('/');
+      // Short-lived cookie — phase and challengeIndex stored here, never in the URL
+      Astro.cookies.set('mnemonic', JSON.stringify({ words: mnemonic, phase: 'write', challengeIndex: null }), {
+        httpOnly: true,
+        path: '/',
+        maxAge: 60 * 30, // 30 minutes to complete setup
+        sameSite: 'lax',
+      });
+      return Astro.redirect('/recovery-setup');
     } else {
       const body = await res.json();
       error = Array.isArray(body.message) ? body.message[0] : (body.message ?? 'Signup failed');

@@ -1,0 +1,93 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const token = Astro.cookies.get('token')?.value;
+const API_URL = process.env.API_URL || 'http://api:3000';
+let error = '';
+
+if (Astro.request.method === 'POST' && token) {
+  const data = await Astro.request.formData();
+  const words = Array.from({ length: 12 }, (_, i) => (data.get(`word${i + 1}`) as string ?? '').trim().toLowerCase());
+  const mnemonic = words.join(' ');
+
+  try {
+    const res = await fetch(`${API_URL}/api/users/me`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ mnemonic }),
+    });
+
+    if (res.status === 204) {
+      Astro.cookies.delete('token', { path: '/' });
+      return Astro.redirect('/login');
+    } else if (res.status === 403) {
+      error = 'Invalid recovery phrase.';
+    } else {
+      error = 'Something went wrong. Please try again.';
+    }
+  } catch {
+    error = 'Could not reach API.';
+  }
+}
+---
+
+<Layout title="Delete Account — Crypto Demo">
+  <div class="min-h-screen flex flex-col items-center justify-center p-4 py-12">
+    <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+      <div class="card-body gap-5">
+
+        <div>
+          <h1 class="card-title text-2xl text-error">Delete account</h1>
+          <p class="text-sm text-base-content/70 mt-1">
+            This will permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+        </div>
+
+        <div role="alert" class="alert alert-error text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Enter your 12-word recovery phrase to confirm deletion.</span>
+        </div>
+
+        {error && (
+          <div role="alert" class="alert alert-error text-sm">{error}</div>
+        )}
+
+        <form method="POST" class="flex flex-col gap-5">
+          <div>
+            <div class="label pb-1"><span class="label-text">Recovery phrase</span></div>
+            <div class="grid grid-cols-2 gap-2">
+              {Array.from({ length: 12 }, (_, i) => (
+                <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-1.5">
+                  <span class="text-xs text-base-content/50 w-5 text-right shrink-0">{i + 1}.</span>
+                  <input
+                    type="text"
+                    name={`word${i + 1}`}
+                    required
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck={false}
+                    class="bg-transparent font-mono text-sm w-full outline-none placeholder:text-base-content/30"
+                    placeholder="word"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-error w-full">
+            Permanently delete my account
+          </button>
+        </form>
+
+        <a href="/" class="btn btn-ghost btn-sm w-fit">Cancel</a>
+
+      </div>
+    </div>
+  </div>
+</Layout>

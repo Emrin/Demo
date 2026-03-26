@@ -10,9 +10,11 @@ datasource db {
 
 model User {
   id           Int           @id @default(autoincrement())
-  username     String        @unique
-  passwordHash String        @default("")
-  balanceSats  BigInt        @default(0)
+  username          String        @unique
+  passwordHash      String        @default("")
+  mnemonicHash      String        @default("")
+  mnemonicConfirmed Boolean       @default(false)
+  balanceSats       BigInt        @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   transactions Transaction[]

@@ -6,19 +6,6 @@ const isLoggedIn = !!token;
 
 const API_URL = process.env.API_URL || 'http://api:3000';
 
-// Handle delete account
-if (Astro.request.method === 'POST' && token) {
-  const form = await Astro.request.formData();
-  if (form.get('_action') === 'delete-account') {
-    await fetch(`${API_URL}/api/users/me`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    }).catch(() => {});
-    Astro.cookies.delete('token', { path: '/' });
-    return Astro.redirect('/login');
-  }
-}
-
 // Decode username from JWT payload (display only — auth is handled by the API)
 let username: string | null = null;
 if (token) {
@@ -75,16 +62,9 @@ if (isLoggedIn && token) {
 
             <div class="divider"></div>
 
-            <form method="POST">
-              <input type="hidden" name="_action" value="delete-account" />
-              <button
-                type="submit"
-                class="btn btn-error btn-outline btn-sm"
-                onclick="return confirm('Permanently delete your account and all data? This cannot be undone.')"
-              >
-                Delete account
-              </button>
-            </form>
+            <a href="/delete-account" class="btn btn-error btn-outline btn-sm w-fit">
+              Delete account
+            </a>
           </>
         ) : (
           <div class="card-actions">
