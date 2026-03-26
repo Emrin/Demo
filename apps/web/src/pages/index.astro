@@ -1,4 +1,6 @@
 ---
+const token = Astro.cookies.get('token')?.value;
+const isLoggedIn = !!token;
 ---
 
 <html lang="en">
@@ -14,10 +16,25 @@
 			button { padding: 0.5rem 1.25rem; font-size: 1rem; cursor: pointer; }
 			#result { margin-top: 1rem; color: #333; }
 			#result.error { color: #c00; }
+			.auth-links { margin-top: 1.5rem; }
+			.auth-links a { margin-right: 1rem; }
 		</style>
 	</head>
 	<body>
 		<h1>Crypto Demo</h1>
+
+		{isLoggedIn ? (
+			<div class="auth-links">
+				<span>Logged in</span>
+				<a href="/logout">Log out</a>
+			</div>
+		) : (
+			<div class="auth-links">
+				<a href="/login">Log in</a>
+				<a href="/signup">Sign up</a>
+			</div>
+		)}
+
 		<button id="hello-btn">Test API Connection</button>
 		<p id="result"></p>
 		<script>

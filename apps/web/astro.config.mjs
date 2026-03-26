@@ -11,4 +11,7 @@ export default defineConfig({
   build: {
     assets: "_assets"
   },
+  security: {
+    checkOrigin: false,
+  },
 });

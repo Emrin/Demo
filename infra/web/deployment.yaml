@@ -30,3 +30,5 @@ spec:
               value: "0.0.0.0"
             - name: PORT
               value: "4321"
+            - name: API_URL
+              value: "http://api:3000"
