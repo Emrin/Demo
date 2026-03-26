@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
   Req,
   UseGuards,
@@ -44,6 +46,22 @@ export class DepositsController {
   @Get('status/:invoiceId')
   getInvoiceStatus(@Param('invoiceId') invoiceId: string) {
     return this.depositsService.getInvoiceStatus(invoiceId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('transactions')
+  getTransactions(@Req() req: AuthenticatedRequest) {
+    return this.depositsService.getUserTransactions(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  softDelete(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.depositsService.softDeleteTransaction(id, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)

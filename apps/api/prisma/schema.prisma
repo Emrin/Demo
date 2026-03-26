@@ -25,7 +25,8 @@ model Transaction {
   user       User     @relation(fields: [userId], references: [id])
   invoiceId  String   @unique
   amountSats BigInt
-  status     String   @default("pending")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  status     String    @default("pending")
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }

@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -28,6 +30,18 @@ export class DepositsService {
     address: string;
     status: string;
   }> {
+    // Enforce 1 pending invoice per user
+    const existing = await this.prisma.transaction.findFirst({
+      where: { userId, status: 'pending', deletedAt: null },
+    });
+    if (existing) {
+      throw new ConflictException({
+        message: 'You already have a pending deposit',
+        invoiceId: existing.invoiceId,
+        amountSats: existing.amountSats.toString(),
+      });
+    }
+
     const amountBtc = (amountSats / 1e8).toFixed(8);
 
     // Create invoice via BtcPayServer Greenfield API
@@ -209,6 +223,45 @@ export class DepositsService {
     }
 
     return { status: transaction.status };
+  }
+
+  async getUserTransactions(userId: number): Promise<{
+    pending: object[];
+    history: object[];
+  }> {
+    const txs = await this.prisma.transaction.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const serialize = (tx: (typeof txs)[number]) => ({
+      ...tx,
+      amountSats: tx.amountSats.toString(),
+    });
+
+    return {
+      pending: txs.filter((t) => t.status === 'pending').map(serialize),
+      history: txs.filter((t) => t.status !== 'pending').map(serialize),
+    };
+  }
+
+  async softDeleteTransaction(id: number, userId: number): Promise<void> {
+    const tx = await this.prisma.transaction.findUnique({ where: { id } });
+
+    if (!tx || tx.deletedAt !== null) {
+      throw new BadRequestException('Transaction not found');
+    }
+    if (tx.userId !== userId) {
+      throw new ForbiddenException();
+    }
+    if (tx.status === 'pending') {
+      throw new BadRequestException('Cannot remove a pending invoice');
+    }
+
+    await this.prisma.transaction.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   async getUserBalance(userId: number): Promise<{ balanceSats: string }> {

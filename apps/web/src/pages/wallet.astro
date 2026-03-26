@@ -1,0 +1,139 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const token = Astro.cookies.get('token')?.value;
+if (!token) return Astro.redirect('/login');
+
+const API_URL = process.env.API_URL || 'http://api:3000';
+const headers = { Authorization: `Bearer ${token}` };
+
+// Handle delete form submission
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const id = form.get('id');
+  if (id) {
+    await fetch(`${API_URL}/api/deposits/${id}`, { method: 'DELETE', headers });
+  }
+  return Astro.redirect('/wallet');
+}
+
+type Tx = {
+  id: number;
+  invoiceId: string;
+  amountSats: string;
+  status: string;
+  createdAt: string;
+};
+
+const [balanceRes, txRes] = await Promise.all([
+  fetch(`${API_URL}/api/deposits/balance`, { headers }),
+  fetch(`${API_URL}/api/deposits/transactions`, { headers }),
+]);
+
+const { balanceSats } = balanceRes.ok ? await balanceRes.json() : { balanceSats: '0' };
+const { pending, history } = txRes.ok
+  ? await txRes.json()
+  : { pending: [], history: [] };
+
+const balanceBtc = (Number(balanceSats) / 1e8).toFixed(8);
+
+function satsToDisplay(sats: string) {
+  return `${Number(sats).toLocaleString()} sats (${(Number(sats) / 1e8).toFixed(8)} BTC)`;
+}
+---
+
+<Layout title="Wallet — Crypto Demo">
+  <div class="min-h-screen p-4 max-w-2xl mx-auto flex flex-col gap-6 py-8">
+
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">Wallet</h1>
+      <a href="/" class="btn btn-ghost btn-sm">Back</a>
+    </div>
+
+    <!-- Balance -->
+    <div class="stats shadow w-full">
+      <div class="stat">
+        <div class="stat-title">Balance</div>
+        <div class="stat-value text-primary text-2xl">{balanceBtc} BTC</div>
+        <div class="stat-desc">{Number(balanceSats).toLocaleString()} sats</div>
+      </div>
+    </div>
+
+    <!-- Pending invoice -->
+    {(pending as Tx[]).length > 0 ? (
+      <div class="card bg-base-100 shadow">
+        <div class="card-body gap-3">
+          <h2 class="card-title text-lg">Pending Deposit</h2>
+          {(pending as Tx[]).map((tx) => (
+            <div class="flex flex-col gap-1 text-sm">
+              <div class="flex items-center gap-2">
+                <span class="badge badge-warning">pending</span>
+                <span class="font-medium">{satsToDisplay(tx.amountSats)}</span>
+              </div>
+              <div class="text-base-content/60 font-mono text-xs break-all">Invoice: {tx.invoiceId}</div>
+              <a href={`/deposit/${tx.invoiceId}?amountSats=${tx.amountSats}&address=`} class="btn btn-sm btn-outline mt-1 w-fit">
+                View payment details
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <a href="/deposit" class="btn btn-primary w-full">+ New Deposit</a>
+    )}
+
+    <!-- Transaction history -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body gap-3">
+        <h2 class="card-title text-lg">History</h2>
+
+        {(history as Tx[]).length === 0 ? (
+          <p class="text-sm text-base-content/60">No transactions yet.</p>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(history as Tx[]).map((tx) => (
+                  <tr>
+                    <td class="text-xs text-base-content/70">
+                      {new Date(tx.createdAt).toLocaleString()}
+                    </td>
+                    <td class="font-mono text-sm">
+                      {Number(tx.amountSats).toLocaleString()} sats
+                    </td>
+                    <td>
+                      <span class={`badge badge-sm ${tx.status === 'settled' ? 'badge-success' : 'badge-error'}`}>
+                        {tx.status}
+                      </span>
+                    </td>
+                    <td>
+                      <form method="POST">
+                        <input type="hidden" name="id" value={tx.id} />
+                        <button
+                          type="submit"
+                          class="btn btn-ghost btn-xs text-error"
+                          onclick="return confirm('Remove from history?')"
+                        >
+                          Remove
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+
+  </div>
+</Layout>

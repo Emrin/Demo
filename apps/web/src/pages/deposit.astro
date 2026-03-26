@@ -24,7 +24,12 @@ if (Astro.request.method === 'POST') {
       body: JSON.stringify({ amountSats }),
     });
 
-    if (!res.ok) {
+    if (res.status === 409) {
+      const body = await res.json().catch(() => ({})) as { invoiceId?: string; amountSats?: string };
+      if (body.invoiceId) {
+        return Astro.redirect(`/deposit/${body.invoiceId}?amountSats=${body.amountSats ?? ''}&address=`);
+      }
+    } else if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       errorMessage = (body as { message?: string }).message ?? `Request failed with status ${res.status}`;
     } else {
