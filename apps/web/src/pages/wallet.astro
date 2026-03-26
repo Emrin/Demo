@@ -21,6 +21,7 @@ type Tx = {
   id: number;
   invoiceId: string;
   amountSats: string;
+  address: string;
   status: string;
   createdAt: string;
 };
@@ -71,7 +72,7 @@ function satsToDisplay(sats: string) {
                 <span class="font-medium">{satsToDisplay(tx.amountSats)}</span>
               </div>
               <div class="text-base-content/60 font-mono text-xs break-all">Invoice: {tx.invoiceId}</div>
-              <a href={`/deposit/${tx.invoiceId}?amountSats=${tx.amountSats}&address=`} class="btn btn-sm btn-outline mt-1 w-fit">
+              <a href={`/deposit/${tx.invoiceId}?amountSats=${tx.amountSats}&address=${encodeURIComponent(tx.address)}`} class="btn btn-sm btn-outline mt-1 w-fit">
                 View payment details
               </a>
             </div>

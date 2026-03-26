@@ -39,6 +39,7 @@ export class DepositsService {
         message: 'You already have a pending deposit',
         invoiceId: existing.invoiceId,
         amountSats: existing.amountSats.toString(),
+        address: existing.address,
       });
     }
 
@@ -111,6 +112,7 @@ export class DepositsService {
         userId,
         invoiceId,
         amountSats: BigInt(amountSats),
+        address,
         status: 'pending',
       },
     });
@@ -237,6 +239,7 @@ export class DepositsService {
     const serialize = (tx: (typeof txs)[number]) => ({
       ...tx,
       amountSats: tx.amountSats.toString(),
+      address: tx.address,
     });
 
     return {

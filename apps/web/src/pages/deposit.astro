@@ -25,9 +25,9 @@ if (Astro.request.method === 'POST') {
     });
 
     if (res.status === 409) {
-      const body = await res.json().catch(() => ({})) as { invoiceId?: string; amountSats?: string };
+      const body = await res.json().catch(() => ({})) as { invoiceId?: string; amountSats?: string; address?: string };
       if (body.invoiceId) {
-        return Astro.redirect(`/deposit/${body.invoiceId}?amountSats=${body.amountSats ?? ''}&address=`);
+        return Astro.redirect(`/deposit/${body.invoiceId}?amountSats=${body.amountSats ?? ''}&address=${encodeURIComponent(body.address ?? '')}`);
       }
     } else if (!res.ok) {
       const body = await res.json().catch(() => ({}));
