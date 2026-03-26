@@ -48,12 +48,16 @@ kubectl create secret generic postgres-credentials \
   --from-env-file="${ROOT}/infra/postgres/secret.env" \
   --namespace=crypto-demo \
   --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "${ROOT}/infra/postgres/pvc.yaml"
 kubectl apply -f "${ROOT}/infra/postgres/deployment.yaml"
 kubectl apply -f "${ROOT}/infra/postgres/service.yaml"
 kubectl apply -f "${ROOT}/infra/redis/"
 kubectl apply -f "${ROOT}/infra/api/"
 kubectl apply -f "${ROOT}/infra/web/"
 kubectl apply -f "${ROOT}/infra/ingress.yaml"
+kubectl apply -f "${ROOT}/infra/bitcoind/"
+kubectl apply -f "${ROOT}/infra/nbxplorer/"
+kubectl apply -f "${ROOT}/infra/btcpayserver/"
 
 # ── 6. Restart deployments to pick up newly imported images ────────────────────
 info "Restarting deployments to pick up new images..."
@@ -66,15 +70,19 @@ kubectl rollout status deployment/postgres -n crypto-demo --timeout=120s
 kubectl rollout status deployment/redis -n crypto-demo --timeout=120s
 kubectl rollout status deployment/api -n crypto-demo --timeout=120s
 kubectl rollout status deployment/web -n crypto-demo --timeout=120s
+kubectl rollout status deployment/bitcoind -n crypto-demo --timeout=120s
+kubectl rollout status deployment/nbxplorer -n crypto-demo --timeout=120s
+kubectl rollout status deployment/btcpayserver -n crypto-demo --timeout=300s
 
 # ── 8. Summary ─────────────────────────────────────────────────────────────────
 echo ""
-echo "╔══════════════════════════════════════════╗"
-echo "║         Cluster ready                    ║"
-echo "╠══════════════════════════════════════════╣"
-echo "║  Web app  →  http://localhost:8080       ║"
-echo "║  API      →  http://localhost:8080/api/hello ║"
-echo "╚══════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════════════╗"
+echo "║         Cluster ready                                                ║"
+echo "╠══════════════════════════════════════════════════════════════════════╣"
+echo "║  Web app      →  http://localhost:8080                               ║"
+echo "║  API          →  http://localhost:8080/api/hello                     ║"
+echo "║  BtcPayServer →  kubectl port-forward -n crypto-demo service/btcpayserver 14142:14142 ║"
+echo "╚══════════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "Nodes (simulated VPS servers):"
 kubectl get nodes -L vps-role

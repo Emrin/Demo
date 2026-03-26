@@ -40,3 +40,20 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: JWT_SECRET
+            - name: BTCPAY_URL
+              value: "http://btcpayserver:14142"
+            - name: BTCPAY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: BTCPAY_API_KEY
+            - name: BTCPAY_STORE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: BTCPAY_STORE_ID
+            - name: BTCPAY_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: BTCPAY_WEBHOOK_SECRET

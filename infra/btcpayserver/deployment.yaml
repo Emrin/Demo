@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: btcpayserver-data
+  namespace: crypto-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btcpayserver
+  namespace: crypto-demo
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: btcpayserver
+  template:
+    metadata:
+      labels:
+        app: btcpayserver
+    spec:
+      initContainers:
+        - name: init-db
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres; do
+                echo "Waiting for postgres..."; sleep 2
+              done
+              psql -h postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='btcpay'" \
+                | grep -q 1 || psql -h postgres -U postgres -c "CREATE DATABASE btcpay"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+      containers:
+        - name: btcpayserver
+          image: btcpayserver/btcpayserver:2.3.6
+          ports:
+            - containerPort: 14142
+          env:
+            - name: BTCPAY_NETWORK
+              value: regtest
+            - name: BTCPAY_BIND
+              value: "0.0.0.0:14142"
+            - name: BTCPAY_EXTERNALURL
+              value: http://btcpayserver:14142
+            - name: BTCPAY_BTCEXPLORERURL
+              value: http://nbxplorer:32838
+            - name: BTCPAY_POSTGRES
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: BTCPAY_POSTGRES
+          volumeMounts:
+            - name: data
+              mountPath: /datadir
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: btcpayserver-data

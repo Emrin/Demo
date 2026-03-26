@@ -9,10 +9,23 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
   name         String?
-  passwordHash String   @default("")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  passwordHash String        @default("")
+  balanceSats  BigInt        @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Transaction {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  invoiceId  String   @unique
+  amountSats BigInt
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bitcoind-data
+  namespace: crypto-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitcoind
+  namespace: crypto-demo
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: bitcoind
+  template:
+    metadata:
+      labels:
+        app: bitcoind
+    spec:
+      containers:
+        - name: bitcoind
+          image: btcpayserver/bitcoin:29.1
+          ports:
+            - containerPort: 18443
+              name: rpc
+            - containerPort: 18444
+              name: p2p
+          env:
+            - name: BITCOIN_NETWORK
+              value: regtest
+            - name: BITCOIN_EXTRA_ARGS
+              value: |
+                rpcuser=bitcoin
+                rpcpassword=bitcoin
+                rpcallowip=0.0.0.0/0
+                rpcbind=0.0.0.0
+                whitelist=0.0.0.0/0
+                listen=1
+                listenonion=0
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "256Mi"
+            limits:
+              memory: "512Mi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: bitcoind-data

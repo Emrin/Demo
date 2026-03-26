@@ -1,7 +1,30 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
 const token = Astro.cookies.get('token')?.value;
 const isLoggedIn = !!token;
+
+const API_URL = process.env.API_URL || 'http://api:3000';
+
+let balanceSats: string | null = null;
+let balanceBtc: string | null = null;
+
+if (isLoggedIn && token) {
+  try {
+    const res = await fetch(`${API_URL}/api/deposits/balance`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { balanceSats: string };
+      balanceSats = data.balanceSats;
+      balanceBtc = (Number(data.balanceSats) / 1e8).toFixed(8);
+    }
+  } catch {
+    // Balance fetch is best-effort; don't break the page
+  }
+}
 ---
 
 <Layout title="Crypto Demo">
@@ -11,10 +34,24 @@ const isLoggedIn = !!token;
         <h1 class="card-title text-2xl">Crypto Demo</h1>
 
         {isLoggedIn ? (
-          <p class="text-success font-medium">Logged in</p>
-          <div class="card-actions">
-            <a href="/logout" class="btn btn-outline btn-sm">Log out</a>
-          </div>
+          <>
+            <p class="text-success font-medium">Logged in</p>
+
+            {balanceSats !== null && (
+              <div class="stats shadow w-full">
+                <div class="stat">
+                  <div class="stat-title">Balance</div>
+                  <div class="stat-value text-primary text-xl">{balanceBtc} BTC</div>
+                  <div class="stat-desc">{Number(balanceSats).toLocaleString()} sats</div>
+                </div>
+              </div>
+            )}
+
+            <div class="card-actions flex-wrap gap-2">
+              <a href="/deposit" class="btn btn-primary">Deposit BTC</a>
+              <a href="/logout" class="btn btn-outline btn-sm">Log out</a>
+            </div>
+          </>
         ) : (
           <div class="card-actions">
             <a href="/login" class="btn btn-primary">Log in</a>

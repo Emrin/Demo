@@ -1,0 +1,96 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const token = Astro.cookies.get('token')?.value;
+if (!token) {
+  return Astro.redirect('/login');
+}
+
+const API_URL = process.env.API_URL || 'http://api:3000';
+
+let errorMessage = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const amountSats = Number(formData.get('amountSats'));
+
+  try {
+    const res = await fetch(`${API_URL}/api/deposits`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ amountSats }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      errorMessage = (body as { message?: string }).message ?? `Request failed with status ${res.status}`;
+    } else {
+      const data = (await res.json()) as {
+        invoiceId: string;
+        amountSats: string;
+        address: string;
+        status: string;
+      };
+      return Astro.redirect(
+        `/deposit/${data.invoiceId}?address=${encodeURIComponent(data.address)}&amountSats=${encodeURIComponent(data.amountSats)}`,
+      );
+    }
+  } catch (err) {
+    errorMessage = err instanceof Error ? err.message : 'Network error';
+  }
+}
+---
+
+<Layout title="Deposit BTC">
+  <div class="min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="card w-full max-w-md bg-base-100 shadow-xl">
+      <div class="card-body gap-4">
+        <h1 class="card-title text-2xl">Deposit Bitcoin</h1>
+        <p class="text-sm text-base-content/70">
+          Enter the amount in satoshis you want to deposit (min 1,000 — max 100,000,000).
+        </p>
+
+        {errorMessage && (
+          <div class="alert alert-error">
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        <form method="POST" class="flex flex-col gap-4">
+          <div class="form-control">
+            <label class="label" for="amountSats">
+              <span class="label-text">Amount (satoshis)</span>
+            </label>
+            <input
+              id="amountSats"
+              name="amountSats"
+              type="number"
+              min="1000"
+              max="100000000"
+              step="1"
+              placeholder="e.g. 100000"
+              required
+              class="input input-bordered w-full"
+            />
+            <label class="label">
+              <span class="label-alt text-xs text-base-content/50">
+                1 BTC = 100,000,000 sats
+              </span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-full">
+            Generate Payment Address
+          </button>
+        </form>
+
+        <div class="card-actions justify-start">
+          <a href="/" class="btn btn-ghost btn-sm">Back to home</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

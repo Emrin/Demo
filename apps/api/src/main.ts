@@ -5,7 +5,7 @@ import cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.setGlobalPrefix('api');
   app.enableCors({ origin: process.env.CORS_ORIGIN || '*' });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
