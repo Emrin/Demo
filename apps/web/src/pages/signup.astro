@@ -7,8 +7,11 @@ if (Astro.request.method === 'POST') {
   const data = await Astro.request.formData();
   const username = data.get('username') as string;
   const password = data.get('password') as string;
+  const confirmPassword = data.get('confirmPassword') as string;
 
-  try {
+  if (password !== confirmPassword) {
+    error = 'Passwords do not match';
+  } else try {
     const res = await fetch(`${API_URL}/api/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -60,8 +63,13 @@ if (Astro.request.method === 'POST') {
 
           <label class="form-control">
             <div class="label"><span class="label-text">Password</span></div>
-            <input type="password" name="password" minlength="8" required class="input input-bordered w-full" />
+            <input type="password" name="password" id="password" minlength="8" required class="input input-bordered w-full" />
             <div class="label"><span class="label-text-alt">Minimum 8 characters</span></div>
+          </label>
+
+          <label class="form-control">
+            <div class="label"><span class="label-text">Confirm password</span></div>
+            <input type="password" name="confirmPassword" id="confirmPassword" minlength="8" required class="input input-bordered w-full" />
           </label>
 
           <button type="submit" class="btn btn-primary w-full mt-2">Create account</button>

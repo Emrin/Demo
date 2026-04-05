@@ -16,13 +16,23 @@ if (Astro.request.method === 'POST') {
     });
 
     if (res.ok) {
-      const { access_token } = await res.json();
-      Astro.cookies.set('token', access_token, {
+      const body = await res.json();
+      Astro.cookies.set('token', body.access_token, {
         httpOnly: true,
         path: '/',
         maxAge: 60 * 60 * 24 * 7,
         sameSite: 'lax',
       });
+      if (body.mnemonic) {
+        // Account exists but recovery phrase was never confirmed — restart setup with a fresh phrase.
+        Astro.cookies.set('mnemonic', JSON.stringify({ words: body.mnemonic, phase: 'write', challengeIndex: null }), {
+          httpOnly: true,
+          path: '/',
+          maxAge: 60 * 30,
+          sameSite: 'lax',
+        });
+        return Astro.redirect('/recovery-setup');
+      }
       return Astro.redirect('/');
     } else {
       error = 'Invalid username or password';

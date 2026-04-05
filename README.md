@@ -1,8 +1,20 @@
-# crypto-demo
+# onchain-pay
 
-A privacy-focused cryptocurrency payment platform supporting **BTC, LTC, and XMR**. No emails, no KYC — users sign up with a username and password, recover accounts via mnemonic, deposit any supported coin, and accumulate a balance.
+A self-hosted cryptocurrency payment gateway supporting **BTC, LTC, and XMR** — no Stripe, no CoinPayments, no custodian. Every deposit is tracked directly on-chain.
+
+Users sign up with a username and password, back up a BIP39 mnemonic, deposit any supported coin, and accumulate a balance. No email, no KYC.
 
 Everything runs inside a local **k3d** (Kubernetes-in-Docker) cluster that simulates a 3-node VPS topology. Zero cloud accounts required.
+
+---
+
+## What's non-trivial here
+
+- **Direct blockchain integration** — BTC and LTC addresses are derived from an xpub using BIP84 (native SegWit). [NBXplorer](https://github.com/dgarage/NBXplorer) indexes the chain and pushes events via long-poll; the API processes `newtransaction` and `newblock` events to track confirmations in real time. No wrapped API, no webhook service.
+- **Monero subaddresses** — each invoice gets a fresh subaddress from `monero-wallet-rpc`. Incoming transfers are detected via `get_transfers` (including mempool), confirmed at 10 blocks. XMR daemon connects to remote onion nodes through Tor with automatic failover.
+- **Invoice lifecycle** — 30-minute TTL enforced by a cron job; one active invoice per user per currency; overpayments credited in full; underpayments flagged with the shortfall shown in the UI.
+- **Privacy by default** — CoinGecko price fetches routed through Tor; XMR daemon traffic never leaves Tor; no third-party payment processor receives transaction data.
+- **Production-grade auth** — JWT in an `httpOnly` cookie; BIP39 mnemonic recovery flow with a write-then-verify challenge; rate limiting (global 120 req/min, auth 10 req/15 min); stale unconfirmed accounts auto-deleted after 24 h.
 
 ---
 
@@ -260,7 +272,7 @@ pnpm cluster:redeploy-web   # after web (Astro) changes
 ## Project structure
 
 ```
-crypto-demo/
+onchain-pay/
 ├── apps/
 │   ├── api/                    # NestJS application
 │   │   ├── prisma/             # schema.prisma + migrations

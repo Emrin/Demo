@@ -66,8 +66,17 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    return {
-      access_token: this.jwt.sign({ sub: user.id, username: user.username, confirmed: user.mnemonicConfirmed }),
-    };
+    const access_token = this.jwt.sign({ sub: user.id, username: user.username, confirmed: user.mnemonicConfirmed });
+
+    if (!user.mnemonicConfirmed) {
+      // The previous mnemonic was never confirmed — the user never wrote it down, so the
+      // stored hash is useless. Generate a fresh one so they can complete setup now.
+      const mnemonic = bip39.generateMnemonic();
+      const mnemonicHash = await bcrypt.hash(mnemonic, 10);
+      await this.prisma.user.update({ where: { id: user.id }, data: { mnemonicHash } });
+      return { access_token, mnemonic: mnemonic.split(' ') };
+    }
+
+    return { access_token };
   }
 }

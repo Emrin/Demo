@@ -81,9 +81,9 @@ if (Astro.request.method === 'POST') {
           <div class="flex flex-col gap-4">
             <h1 class="card-title text-2xl">Recovery setup required</h1>
             <div role="alert" class="alert alert-warning text-sm">
-              Your recovery setup session has expired. Please sign up again or contact support.
+              Your recovery setup session has expired. Log in again — a new recovery phrase will be generated for you to save.
             </div>
-            <a href="/signup" class="btn btn-primary w-full">Sign up again</a>
+            <a href="/login" class="btn btn-primary w-full">Log in to continue</a>
           </div>
         ) : state.phase === 'write' ? (
           <>

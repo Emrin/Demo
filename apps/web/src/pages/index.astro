@@ -7,13 +7,19 @@ const isLoggedIn = !!token;
 
 const API_URL = process.env.API_URL || 'http://api:3000';
 
-// Decode username from JWT payload (display only — auth is handled by the API)
+// Decode JWT payload (display only — auth is handled by the API)
 let username: string | null = null;
+let confirmed = true;
 if (token) {
   try {
-    username = JSON.parse(atob(token.split('.')[1])).username ?? null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    username = payload.username ?? null;
+    confirmed = payload.confirmed ?? true;
   } catch { /* ignore */ }
 }
+
+// Unconfirmed users must complete recovery setup before accessing the app.
+if (token && !confirmed) return Astro.redirect('/recovery-setup');
 
 let balanceSats: string | null = null;
 let balanceBtc: string | null = null;
