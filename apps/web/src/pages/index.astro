@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getPrices, satsToUsd, litoshisToUsd, formatUsd } from '../lib/prices';
+import { getPrices, satsToUsd, litoshisToUsd, piconerosToUsd, formatUsd } from '../lib/prices';
 
 const token = Astro.cookies.get('token')?.value;
 const isLoggedIn = !!token;
@@ -25,8 +25,11 @@ let balanceSats: string | null = null;
 let balanceBtc: string | null = null;
 let balanceLitoshi: string | null = null;
 let balanceLtc: string | null = null;
+let balancePiconero: string | null = null;
+let balanceXmr: string | null = null;
 let balanceBtcUsd: string | null = null;
 let balanceLtcUsd: string | null = null;
+let balanceXmrUsd: string | null = null;
 
 if (isLoggedIn && token) {
   const [balanceRes, prices] = await Promise.all([
@@ -36,22 +39,25 @@ if (isLoggedIn && token) {
     getPrices(),
   ]);
   if (balanceRes?.ok) {
-    const data = (await balanceRes.json()) as { balanceSats: string; balanceLitoshi: string };
+    const data = (await balanceRes.json()) as { balanceSats: string; balanceLitoshi: string; balancePiconero: string };
     balanceSats = data.balanceSats;
     balanceBtc = (Number(data.balanceSats) / 1e8).toFixed(8);
     balanceLitoshi = data.balanceLitoshi;
     balanceLtc = (Number(data.balanceLitoshi) / 1e8).toFixed(8);
+    balancePiconero = data.balancePiconero;
+    balanceXmr = (Number(data.balancePiconero) / 1e12).toFixed(12);
     balanceBtcUsd = formatUsd(satsToUsd(data.balanceSats, prices.btcUsd));
     balanceLtcUsd = formatUsd(litoshisToUsd(data.balanceLitoshi, prices.ltcUsd));
+    balanceXmrUsd = formatUsd(piconerosToUsd(data.balancePiconero, prices.xmrUsd));
   }
 }
 ---
 
-<Layout title="Crypto Demo">
+<Layout title="onchain-pay">
   <div class="min-h-screen flex flex-col items-center justify-center p-4">
     <div class="card w-full max-w-md bg-base-100 shadow-xl">
       <div class="card-body gap-4">
-        <h1 class="card-title text-2xl">Crypto Demo</h1>
+        <h1 class="card-title text-2xl">onchain-pay</h1>
 
         {isLoggedIn ? (
           <>
@@ -60,7 +66,7 @@ if (isLoggedIn && token) {
             </p>
 
             {balanceSats !== null && (
-              <div class="stats shadow w-full">
+              <div class="stats stats-vertical w-full bg-base-200 rounded-box">
                 <div class="stat">
                   <div class="stat-title">BTC Balance</div>
                   <div class="stat-value text-primary text-lg">{balanceBtcUsd}</div>
@@ -71,11 +77,17 @@ if (isLoggedIn && token) {
                   <div class="stat-value text-secondary text-lg">{balanceLtcUsd}</div>
                   <div class="stat-desc">{balanceLtc} LTC</div>
                 </div>
+                <div class="stat">
+                  <div class="stat-title">XMR Balance</div>
+                  <div class="stat-value text-accent text-lg">{balanceXmrUsd}</div>
+                  <div class="stat-desc">{balanceXmr} XMR</div>
+                </div>
               </div>
             )}
 
             <div class="card-actions flex-wrap gap-2">
-              <a href="/wallet" class="btn btn-primary">Wallet</a>
+              <a href="/deposit" class="btn btn-primary">Deposit</a>
+              <a href="/wallet" class="btn btn-outline">Wallet</a>
               <a href="/logout" class="btn btn-outline btn-sm">Log out</a>
             </div>
 
