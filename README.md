@@ -110,13 +110,15 @@ The fastest way to see everything working end-to-end. BTC/LTC run in regtest mod
 pnpm install
 ```
 
-**2. Create dev wallet credentials** (first time only)
+**2. Create secrets files** (first time only)
 
 ```bash
+# Postgres / JWT (edit to set real passwords, or leave changeme for local testing)
+cp infra/postgres/secret.env.example infra/postgres/secret.env
+
+# Wallet credentials — example already includes working regtest keys, no changes needed
 cp infra/wallet/secret.dev.yaml.example infra/wallet/secret.dev.yaml
 ```
-
-The example already includes working regtest keys — no wallet setup needed.
 
 **3. Start the dev cluster**
 
@@ -152,19 +154,28 @@ Runs only Postgres + Redis in Docker. API and web run with hot reload via `pnpm 
 pnpm install
 ```
 
-**2. Start the database**
+**2. Copy environment files** (first time only)
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+Both files contain working defaults for local development — no changes needed.
+
+**3. Start the database**
 
 ```bash
 pnpm db:up
 ```
 
-**3. Apply migrations** (first time only)
+**4. Apply migrations** (first time only)
 
 ```bash
 pnpm db:migrate --name init
 ```
 
-**4. Start everything in watch mode**
+**5. Start everything in watch mode**
 
 ```bash
 pnpm dev
