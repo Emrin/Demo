@@ -107,7 +107,44 @@ kubectl rollout status deployment/xmr-wallet -n crypto-demo --timeout=120s
 kubectl rollout status deployment/api        -n crypto-demo --timeout=120s
 kubectl rollout status deployment/web        -n crypto-demo --timeout=120s
 
-# ── 9. Summary ─────────────────────────────────────────────────────────────────
+# ── 9. Dev: create regtest wallets so getnewaddress works in confirmation blocks ─
+if [[ "$MODE" == "dev" ]]; then
+  info "Creating regtest wallets..."
+
+  _btc_cli() {
+    kubectl exec -n crypto-demo deployment/bitcoind -- \
+      bitcoin-cli -regtest -rpcuser=bitcoin -rpcpassword=changeme "$@" 2>/dev/null
+  }
+  _ltc_cli() {
+    kubectl exec -n crypto-demo deployment/litecoind -- \
+      litecoin-cli -regtest -rpcuser=litecoin -rpcpassword=changeme "$@" 2>/dev/null
+  }
+
+  # Wait for bitcoind RPC to be ready (up to 60 s)
+  info "  Waiting for bitcoind RPC..."
+  for i in $(seq 1 30); do
+    _btc_cli getblockcount &>/dev/null && break || true
+    sleep 2
+  done
+
+  # Wait for litecoind RPC to be ready (up to 60 s)
+  info "  Waiting for litecoind RPC..."
+  for i in $(seq 1 30); do
+    _ltc_cli getblockcount &>/dev/null && break || true
+    sleep 2
+  done
+
+  # createwallet is idempotent — safe to run on re-deploy.
+  # The wallet is only needed so getnewaddress works when mining confirmation blocks.
+  # Payments use generatetoaddress (no wallet required) so no pre-funding is needed.
+  _btc_cli createwallet "default" 2>/dev/null || true
+  _ltc_cli createwallet "default" 2>/dev/null || true
+
+  info "  Regtest wallets ready."
+fi
+
+# ── 10. Summary ────────────────────────────────────────────────────────────────
+echo ""
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
 if [[ "$MODE" == "dev" ]]; then

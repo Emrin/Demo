@@ -27,16 +27,19 @@ const isRegtest = process.env.NETWORK === 'regtest';
 // Confirmations required to settle — must mirror nbxplorer-poller.service.ts and xmr-poller.service.ts
 const required = currency === 'XMR' ? 10 : currency === 'LTC' ? 6 : 2;
 
-// Mine 1 block at a time so users can watch confirmations increment
-// First mine sends funds to the deposit address (creates the payment tx).
-// Subsequent mines go to a throwaway address so only one coinbase tx lands
-// on the deposit address — subsequent blocks just add confirmations to it.
-const cli = currency === 'LTC'
-  ? `kubectl exec -n crypto-demo deployment/litecoind -- litecoin-cli -regtest -rpcuser=litecoin -rpcpassword=changeme`
-  : `kubectl exec -n crypto-demo deployment/bitcoind -- bitcoin-cli -regtest -rpcuser=bitcoin -rpcpassword=changeme`;
-const mineCmd =
-  `${cli} generatetoaddress 1 ${address}   # run once to send funds\n` +
-  `${cli} generatetoaddress 1 $(${cli} getnewaddress)  # run ${required - 1}× more to confirm`;
+const kubectlExec = currency === 'LTC'
+  ? `kubectl exec -n crypto-demo deployment/litecoind --`
+  : `kubectl exec -n crypto-demo deployment/bitcoind --`;
+const nodeCliCmd = currency === 'LTC'
+  ? `litecoin-cli -regtest -rpcuser=litecoin -rpcpassword=changeme`
+  : `bitcoin-cli -regtest -rpcuser=bitcoin -rpcpassword=changeme`;
+// Step 1: mine 1 block directly to the deposit address → coinbase tx detected by NBXplorer.
+// generatetoaddress needs no wallet; any overpayment (block reward > invoice) is credited as-received.
+const payCmd = `${kubectlExec} ${nodeCliCmd} generatetoaddress 1 ${address}`;
+// Step 2: mine confirmation blocks to a throwaway address so no extra txs land on the deposit address.
+// getnewaddress requires the pre-created wallet (-rpcwallet=default); generatetoaddress does not.
+// sh -c runs inside the container so $() resolves there.
+const confirmCmd = `${kubectlExec} sh -c '${nodeCliCmd} generatetoaddress 1 $(${nodeCliCmd} -rpcwallet=default getnewaddress)'`;
 
 const confirmHint =
   currency === 'XMR'
@@ -107,13 +110,16 @@ const confirmHint =
           <div class="collapse collapse-arrow bg-base-200">
             <input type="checkbox" />
             <div class="collapse-title font-medium">
-              Regtest: mine a block to confirm
+              Regtest: send &amp; confirm manually
             </div>
             <div class="collapse-content">
-              <p class="text-xs text-base-content/70 mb-2">
-                On regtest, transactions need a mined block to confirm. Run this once per confirmation ({required} times to settle):
+              <p class="text-xs text-base-content/70 mb-3">
+                On regtest no real funds exist — use the CLI to simulate a payment and then mine blocks to confirm it.
               </p>
-              <pre class="bg-base-300 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all"><code>{mineCmd}</code></pre>
+              <p class="text-xs font-semibold text-base-content/80 mb-1">Step 1 — mine a block to the deposit address (run once)</p>
+              <pre class="bg-base-300 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all mb-3"><code>{payCmd}</code></pre>
+              <p class="text-xs font-semibold text-base-content/80 mb-1">Step 2 — mine confirmation blocks to a throwaway address (run {required - 1}× more to settle)</p>
+              <pre class="bg-base-300 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap break-all"><code>{confirmCmd}</code></pre>
             </div>
           </div>
         ) : null}

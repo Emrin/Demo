@@ -75,9 +75,12 @@ export class NbxplorerPollerService implements OnModuleInit {
       if (!pending) continue;
 
       if (confirmations < required) {
+        // Store the actual on-chain amount now so handleNewBlock credits the
+        // received amount (not the invoice amount) when it later settles.
+        const receivedUnits = BigInt(Math.round(output.value ?? 0));
         await this.prisma.transaction.update({
           where: { id: pending.id },
-          data: { confirmations, txid: txData.transactionHash },
+          data: { confirmations, txid: txData.transactionHash, amountSats: receivedUnits },
         });
         this.logger.log(
           `${currency} tx ${txData.transactionHash} has ${confirmations}/${required} confirmations`,
