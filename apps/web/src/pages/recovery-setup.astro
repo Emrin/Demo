@@ -23,6 +23,7 @@ function readCookie(): MnemonicCookie | null {
 function setCookie(value: MnemonicCookie) {
   Astro.cookies.set('mnemonic', JSON.stringify(value), {
     httpOnly: true,
+    secure: import.meta.env.PROD,
     path: '/',
     maxAge: 60 * 30,
     sameSite: 'lax',
@@ -54,6 +55,7 @@ if (Astro.request.method === 'POST') {
         const { access_token } = await res.json();
         Astro.cookies.set('token', access_token, {
           httpOnly: true,
+          secure: import.meta.env.PROD,
           path: '/',
           maxAge: 60 * 60 * 24 * 7,
           sameSite: 'lax',

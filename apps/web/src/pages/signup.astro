@@ -22,6 +22,7 @@ if (Astro.request.method === 'POST') {
       const { access_token, mnemonic } = await res.json();
       Astro.cookies.set('token', access_token, {
         httpOnly: true,
+        secure: import.meta.env.PROD,
         path: '/',
         maxAge: 60 * 60 * 24 * 7,
         sameSite: 'lax',
@@ -29,6 +30,7 @@ if (Astro.request.method === 'POST') {
       // Short-lived cookie — phase and challengeIndex stored here, never in the URL
       Astro.cookies.set('mnemonic', JSON.stringify({ words: mnemonic, phase: 'write', challengeIndex: null }), {
         httpOnly: true,
+        secure: import.meta.env.PROD,
         path: '/',
         maxAge: 60 * 30, // 30 minutes to complete setup
         sameSite: 'lax',

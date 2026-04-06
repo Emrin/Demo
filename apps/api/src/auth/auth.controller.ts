@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from './auth.service';
@@ -7,7 +7,7 @@ import { RecoverDto } from './dto/recover.dto';
 import { SignupDto } from './dto/signup.dto';
 
 interface AuthenticatedRequest extends Request {
-  user: { id: number; username: string };
+  user: { id: number; username: string; iat: number };
 }
 
 @Controller('auth')
@@ -33,5 +33,12 @@ export class AuthController {
   @Post('confirm-mnemonic')
   confirmMnemonic(@Req() req: AuthenticatedRequest) {
     return this.authService.confirmMnemonic(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @HttpCode(204)
+  logout(@Req() req: AuthenticatedRequest) {
+    return this.authService.logout(req.user.id, req.user.iat);
   }
 }

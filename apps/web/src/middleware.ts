@@ -11,7 +11,10 @@ function verifyJwt(token: string, secret: string): { sub: number; username: stri
       .update(`${parts[0]}.${parts[1]}`)
       .digest('base64url');
     if (sig !== parts[2]) return null;
-    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    const now = Math.floor(Date.now() / 1000);
+    if (typeof payload.exp === 'number' && payload.exp < now) return null;
+    return payload;
   } catch {
     return null;
   }

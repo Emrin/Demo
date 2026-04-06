@@ -8,9 +8,12 @@ metadata:
   name: crypto
 servers: 1
 agents: 2
-# Expose port 8080 on the host → port 80 on the k3d load balancer (Traefik)
+# Expose HTTP and HTTPS on the host → k3d load balancer (Traefik)
 ports:
   - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+  - port: 8443:443
     nodeFilters:
       - loadbalancer
 options:

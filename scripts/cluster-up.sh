@@ -51,6 +51,15 @@ info "Mode: ${MODE}"
 # ── 1. Cluster ─────────────────────────────────────────────────────────────────
 if k3d cluster list | grep -q "^${CLUSTER}"; then
   info "Cluster '${CLUSTER}' already exists, skipping creation"
+  # Warn if the cluster was created before port 8443 was added to the config
+  if ! docker inspect "k3d-${CLUSTER}-serverlb" 2>/dev/null \
+      | grep -q '"8443/tcp"'; then
+    echo ""
+    echo "  WARNING: This cluster does not expose port 8443 (HTTPS)."
+    echo "  To enable HTTPS, recreate the cluster:"
+    echo "    pnpm cluster:down && pnpm cluster:up${MODE:+ $MODE}"
+    echo ""
+  fi
 else
   info "Creating k3d cluster '${CLUSTER}'..."
   k3d cluster create --config "${ROOT}/infra/k3d-config.yaml"
@@ -75,7 +84,19 @@ docker build -f "${ROOT}/apps/web/Dockerfile" \
 info "Importing images into cluster..."
 k3d image import crypto-api:latest crypto-web:latest -c "${CLUSTER}"
 
-# ── 5. Secrets ─────────────────────────────────────────────────────────────────
+# ── 5. cert-manager ────────────────────────────────────────────────────────────
+if ! kubectl get namespace cert-manager &>/dev/null; then
+  info "Installing cert-manager..."
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+  info "Waiting for cert-manager webhooks to be ready..."
+  kubectl rollout status deployment/cert-manager            -n cert-manager --timeout=120s
+  kubectl rollout status deployment/cert-manager-webhook    -n cert-manager --timeout=120s
+  kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=120s
+else
+  info "cert-manager already installed, skipping"
+fi
+
+# ── 6. Secrets ─────────────────────────────────────────────────────────────────
 info "Applying secrets..."
 kubectl apply -f "${ROOT}/infra/base/namespace.yaml"
 
@@ -86,7 +107,7 @@ kubectl create secret generic postgres-credentials \
 
 kubectl apply -f "$WALLET_SECRET"
 
-# ── 6. Apply manifests via Kustomize ───────────────────────────────────────────
+# ── 7. Apply manifests via Kustomize ───────────────────────────────────────────
 if [[ "$MODE" == "dev" ]]; then
   info "Applying dev overlay (regtest BTC/LTC + XMR stagenet)..."
   kubectl apply -k "${ROOT}/infra/overlays/dev/"
@@ -95,12 +116,12 @@ else
   kubectl apply -k "${ROOT}/infra/base/"
 fi
 
-# ── 7. Restart app deployments to pick up newly imported images ────────────────
+# ── 8. Restart app deployments to pick up newly imported images ────────────────
 info "Restarting app deployments..."
 kubectl rollout restart deployment/api -n crypto-demo
 kubectl rollout restart deployment/web -n crypto-demo
 
-# ── 8. Wait for core services ──────────────────────────────────────────────────
+# ── 9. Wait for core services ──────────────────────────────────────────────────
 info "Waiting for core services..."
 kubectl rollout status deployment/postgres   -n crypto-demo --timeout=120s
 kubectl rollout status deployment/redis      -n crypto-demo --timeout=60s
@@ -109,17 +130,21 @@ kubectl rollout status deployment/xmr-wallet -n crypto-demo --timeout=120s
 kubectl rollout status deployment/api        -n crypto-demo --timeout=120s
 kubectl rollout status deployment/web        -n crypto-demo --timeout=120s
 
-# ── 9. Summary ─────────────────────────────────────────────────────────────────
+# ── 10. Summary ─────────────────────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
 if [[ "$MODE" == "dev" ]]; then
 echo "║  Cluster ready  [DEV — regtest BTC/LTC + XMR stagenet]          ║"
 else
-echo "║  Cluster ready  [MAINNET]                                       ║"
+echo "║  Cluster ready  [MAINNET]                                        ║"
 fi
 echo "╠══════════════════════════════════════════════════════════════════╣"
-echo "║  Web app  →  http://localhost:8080                               ║"
-echo "║  API      →  http://localhost:8080/api/health                    ║"
+echo "║  HTTP   →  http://localhost:8080                                 ║"
+echo "║  HTTPS  →  https://crypto-demo.local:8443  (self-signed cert)   ║"
+echo "║  API    →  http://localhost:8080/api/health                      ║"
+echo "╠══════════════════════════════════════════════════════════════════╣"
+echo "║  To enable HTTPS add to /etc/hosts (one-time):                   ║"
+echo "║    127.0.0.1  crypto-demo.local                                  ║"
 if [[ "$MODE" == "mainnet" ]]; then
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  BTC/LTC deposits unavailable until nodes finish syncing.        ║"

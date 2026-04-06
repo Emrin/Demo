@@ -3,8 +3,14 @@ kind: Ingress
 metadata:
   name: crypto-demo
   namespace: crypto-demo
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - crypto-demo.local
+      secretName: crypto-demo-tls
   rules:
     - http:
         paths:

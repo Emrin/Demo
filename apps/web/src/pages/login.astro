@@ -19,6 +19,7 @@ if (Astro.request.method === 'POST') {
       const body = await res.json();
       Astro.cookies.set('token', body.access_token, {
         httpOnly: true,
+        secure: import.meta.env.PROD,
         path: '/',
         maxAge: 60 * 60 * 24 * 7,
         sameSite: 'lax',
@@ -27,6 +28,7 @@ if (Astro.request.method === 'POST') {
         // Account exists but recovery phrase was never confirmed — restart setup with a fresh phrase.
         Astro.cookies.set('mnemonic', JSON.stringify({ words: body.mnemonic, phase: 'write', challengeIndex: null }), {
           httpOnly: true,
+          secure: import.meta.env.PROD,
           path: '/',
           maxAge: 60 * 30,
           sameSite: 'lax',

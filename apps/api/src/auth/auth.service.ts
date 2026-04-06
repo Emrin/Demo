@@ -1,17 +1,22 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bip39 from 'bip39';
 import * as bcrypt from 'bcrypt';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RecoverDto } from './dto/recover.dto';
 import { SignupDto } from './dto/signup.dto';
+
+const TOKEN_REVOCATION_TTL = 7 * 24 * 60 * 60; // 7 days — matches JWT max lifetime
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -56,7 +61,19 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
 
+    // Revoke all sessions issued before this moment
+    await this.redis.set(
+      `user:${user.id}:revoked_at`,
+      Math.floor(Date.now() / 1000) - 1,
+      'EX',
+      TOKEN_REVOCATION_TTL,
+    );
+
     return { access_token: this.jwt.sign({ sub: user.id, username: user.username, confirmed: true }) };
+  }
+
+  async logout(userId: number, tokenIat: number): Promise<void> {
+    await this.redis.set(`user:${userId}:revoked_at`, tokenIat, 'EX', TOKEN_REVOCATION_TTL);
   }
 
   async login(dto: LoginDto) {

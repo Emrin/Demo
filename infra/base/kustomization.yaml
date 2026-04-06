@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - cert-issuer.yaml
   - ingress.yaml
   - postgres/pvc.yaml
   - postgres/deployment.yaml
